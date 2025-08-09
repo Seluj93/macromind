@@ -2,8 +2,7 @@
   "crons": [
     {
       "path": "/api/generate",
-      "schedule": "0 7 * * *",
-      "timezone": "Europe/Rome",
+      "schedule": "0 5 * * *",
       "region": "fra1"
     }
   ]
