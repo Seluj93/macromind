@@ -1,9 +1,5 @@
 {
   "crons": [
-    {
-      "path": "/api/generate",
-      "schedule": "0 5 * * *",
-      "region": "fra1"
-    }
+    { "path": "/api/generate", "schedule": "0 5 * * *" }
   ]
 }
