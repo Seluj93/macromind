@@ -1,103 +1,137 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import NewsBlock from '../components/NewsBlock';
+import InvestmentAdvisor from '../components/InvestmentAdvisor';
+
+type NewsItem = { title: string; trendIcon?: string };
+type NewsBlockType = { title: string; icon: string; items: NewsItem[] };
+
+const initialFeed: NewsBlockType[] = [
+  {
+    title: 'Macroeconomics',
+    icon: '🏛️',
+    items: [
+      { title: 'US unemployment rate remains at 3.6%', trendIcon: '➖' },
+      { title: 'Eurozone inflation dips to 2.3%', trendIcon: '📉' },
+    ],
+  },
+  {
+    title: 'Markets & Assets',
+    icon: '📊',
+    items: [
+      { title: 'S&P 500 hits new record high', trendIcon: '📈' },
+      { title: 'Gold rises above $2,100 amid inflation fears', trendIcon: '📈' },
+    ],
+  },
+  {
+    title: 'Geopolitics',
+    icon: '🌍',
+    items: [
+      { title: 'China and Philippines clash in South China Sea', trendIcon: '📉' },
+      { title: "Russia warns of NATO 'provocation' near Kaliningrad", trendIcon: '📉' },
+    ],
+  },
+  {
+    title: 'Trade & Supply Chain',
+    icon: '🚢',
+    items: [
+      { title: 'US and India sign new trade pact', trendIcon: '📈' },
+      { title: 'Global container rates rise 10%', trendIcon: '📈' },
+    ],
+  },
+  {
+    title: 'Energy & Commodities',
+    icon: '⚡',
+    items: [
+      { title: 'Oil prices surge after OPEC cuts', trendIcon: '📈' },
+      { title: 'Europe boosts LNG reserves', trendIcon: '📈' },
+    ],
+  },
+  {
+    title: 'Companies & Sectors',
+    icon: '🏢',
+    items: [
+      { title: 'Amazon reports strong Q2 revenue, stock up 6%', trendIcon: '📈' },
+      { title: 'Apple delays Vision Pro launch in Europe', trendIcon: '📉' },
+    ],
+  },
+  {
+    title: 'Science & Tech',
+    icon: '🔬',
+    items: [
+      { title: 'Breakthrough in quantum computing', trendIcon: '📈' },
+      { title: 'AI detects cancer cells with 96% accuracy', trendIcon: '📈' },
+    ],
+  },
+  {
+    title: 'Crypto & DeFi',
+    icon: '₿',
+    items: [
+      { title: 'Bitcoin breaks $70K resistance', trendIcon: '📈' },
+      { title: 'SEC delays Ethereum ETF decision', trendIcon: '➖' },
+    ],
+  },
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [feed, setFeed] = useState(initialFeed);
+  const [selected, setSelected] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+    const newFeed = Array.from(feed);
+    const [moved] = newFeed.splice(result.source.index, 1);
+    newFeed.splice(result.destination.index, 0, moved);
+    setFeed(newFeed);
+  };
+
+  return (
+    <main className="min-h-screen bg-black text-white px-4 py-10">
+      <h1 className="text-3xl font-bold text-center mb-10 flex justify-center items-center gap-2">
+        🧠 <span>MacroMind</span>
+      </h1>
+
+      {/* NEWS GRID (draggable) */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="newsfeed" direction="horizontal">
+          {(provided) => (
+            <div
+              className="flex flex-wrap justify-center gap-6"
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+            >
+              {feed.map((block, index) => (
+                <Draggable key={block.title} draggableId={block.title} index={index}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      onClick={() => setSelected(block.title)}
+                      className={`
+                        w-full sm:w-[48%] lg:w-[22%] transition-all cursor-pointer rounded-xl
+                        ${selected === block.title ? 'ring-4 ring-indigo-400' : ''}
+                        ${snapshot.isDragging ? 'scale-105 opacity-80' : ''}
+                      `}
+                    >
+                      <NewsBlock {...block} />
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+
+      {/* ADVISOR ROW (centered + separated) */}
+      <div className="flex flex-wrap justify-center gap-6 mt-10">
+        <InvestmentAdvisor />
+      </div>
+    </main>
   );
 }
+
