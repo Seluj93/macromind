@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-function supabaseClient() {
+export const runtime = "nodejs";
+
+function supabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE!;
   return createClient(url, key, { auth: { persistSession: false } });
@@ -9,7 +11,8 @@ function supabaseClient() {
 
 export async function GET() {
   try {
-    const supabase = supabaseClient();
+    const supabase = supabaseAdmin();
+
     const { data, error } = await supabase
       .from("feed")
       .select("*")
@@ -18,7 +21,7 @@ export async function GET() {
       .single();
 
     if (error) throw error;
-    return NextResponse.json(data || {}, { status: 200 });
+    return NextResponse.json(data, { status: 200 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
