@@ -79,6 +79,7 @@ export default function Home() {
   const [feed, setFeed] = useState(initialFeed);
   const [selected, setSelected] = useState<string | null>(null);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
     const newFeed = Array.from(feed);
