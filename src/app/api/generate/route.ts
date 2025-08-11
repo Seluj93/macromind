@@ -90,7 +90,7 @@ async function handleGenerate() {
     );
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // <- correct model
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
@@ -125,10 +125,8 @@ async function handleGenerate() {
 
     return NextResponse.json({ ok: true, date_utc: parsed.date_utc, count: parsed.items.length }, { status: 201 });
   } catch (err: unknown) {
-    if (err instanceof Error) {
-      return NextResponse.json({ error: err.message }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Unknown error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
