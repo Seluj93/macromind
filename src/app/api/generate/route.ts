@@ -1,137 +1,139 @@
+// src/app/api/generate/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import OpenAI from "openai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
-/* ------------ config you can tweak later ------------- */
+// ----- ENV & clients -----
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE!;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: { headers: { "X-Client-Info": "macromind-generate" } },
+});
+
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+// ----- EXACT category names used by the UI -----
 const CATEGORIES = [
   "Macroeconomics",
   "Markets & Assets",
   "Geopolitics",
   "Trade & Supply Chain",
-  "Energy & Resources",
+  "Energy & Commodities",
   "Companies & Sectors",
-  "Science, Tech & Innovation",
+  "Science & Tech",
   "Crypto & DeFi",
 ] as const;
-
-const INPUT = { perCategory: 2, freshnessHours: 24 };
-/* ------------------------------------------------------ */
 
 const FeedItemSchema = z.object({
   category: z.enum(CATEGORIES),
   title: z.string().min(6),
   summary: z.string().min(10),
-  stance: z.enum(["bullish", "bearish", "neutral"]),
-  impact: z.number().int().min(1).max(5),
-  sources: z.array(z.object({ name: z.string(), url: z.string().url() })).min(1),
-  tickers: z.array(z.string()).optional().default([]),
-  countries: z.array(z.string()).optional().default([]),
-  published_at: z.string(),
-  confidence: z.number().min(0).max(1),
+  sentiment: z.enum(["Bullish", "Bearish", "Neutral"]),
+  source: z.string().optional(),
+  url: z.string().url().optional(),
 });
 
 const FeedSchema = z.object({
-  date: z.string(),
-  items: z.array(FeedItemSchema),
+  date_utc: z.string(), // YYYY-MM-DD
+  items: z.array(FeedItemSchema).length(CATEGORIES.length * 2),
   model: z.string(),
-  generation_ms: z.number().optional(),
 });
-
-function supabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE;
-  if (!url || !key) throw new Error("Supabase env vars missing");
-  return createClient(url, key, { auth: { persistSession: false } });
-}
 
 function todayUTCDateStr() {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-    .toISOString()
-    .slice(0, 10);
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(now.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-async function generateOnce() {
-  const started = Date.now();
+async function handleGenerate() {
+  try {
+    if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+      return NextResponse.json(
+        { error: "Missing OPENAI_API_KEY / NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE" },
+        { status: 500 }
+      );
+    }
 
-  const dateStr = todayUTCDateStr();
-  const system = `You are a chief investment officer. Generate a daily tactical newsfeed.
-Return STRICT JSON only (no prose). Categories: ${CATEGORIES.join(", ")}.
-Rules: ${INPUT.perCategory} items per category; stance one of bullish/bearish/neutral; impact 1-5.
-All items must be within last ${INPUT.freshnessHours} hours. Include at least one reputable source URL per item.`;
+    const dateStr = todayUTCDateStr();
 
-  const jsonSpec = `{
-  "date": "${dateStr}",
-  "items": [{
-    "category": "<one of ${CATEGORIES.join(" | ")}>",
-    "title": "string",
-    "summary": "string",
-    "stance": "bullish|bearish|neutral",
-    "impact": 1,
-    "sources": [{"name":"string","url":"https://..."}],
-    "tickers": ["NVDA","CL=F"],
-    "countries": ["US","CN"],
-    "published_at": "YYYY-MM-DDTHH:mm:ssZ",
-    "confidence": 0.0
-  }],
-  "model": "string"
-}`;
+    const system = `You are a chief investment officer. Generate a daily tactical newsfeed strictly as JSON. Categories: ${CATEGORIES.join(
+      ", "
+    )}. Rules: exactly 2 items per category; "sentiment" must be Bullish|Bearish|Neutral; include concise "summary"; prefer reputable sources. Only include items from today ${dateStr}T00:00Z to now.`;
 
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const completion = await openai.chat.completions.create({
-    model: "gpt-5-turbo",
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: system },
+    const jsonSpec = JSON.stringify(
       {
-        role: "user",
-        content:
-          `Generate exactly ${CATEGORIES.length * INPUT.perCategory} items covering all categories evenly.\n` +
-          `Respond with JSON matching this schema:\n${jsonSpec}`,
+        date_utc: dateStr,
+        items: [
+          {
+            category: "<one of " + CATEGORIES.join(" | ") + ">",
+            title: "string",
+            summary: "string",
+            sentiment: "Bullish|Bearish|Neutral",
+            source: "Reuters/Bloomberg/FT/...",
+            url: "https://...",
+          },
+        ],
+        model: "string",
       },
-    ],
-    response_format: { type: "json_object" },
-  });
-
-  const raw = completion.choices?.[0]?.message?.content ?? "{}";
-  const parsed = FeedSchema.parse(JSON.parse(raw));
-  const payload = { ...parsed, generation_ms: Date.now() - started };
-
-  const supabase = supabaseAdmin();
-  const { error } = await supabase
-    .from("feed")
-    .upsert(
-      [{
-        date_utc: parsed.date,
-        model: parsed.model,
-        items: parsed.items as unknown as object,
-        generated_at: new Date().toISOString(),
-      }],
-      { onConflict: "date_utc" }
+      null,
+      2
     );
 
-  if (error) throw new Error(`Supabase upsert failed: ${error.message}`);
-  return payload;
-}
+    const completion = await openai.chat.completions.create({
+      // 🔁 this was "gpt-5-turbo" in your deploy; that’s why you got the 404
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content:
+            `Return EXACTLY ${CATEGORIES.length * 2} items covering all categories evenly.\n` +
+            `Respond with a single JSON object shaped like:\n${jsonSpec}`,
+        },
+      ],
+    });
 
-export async function POST() {
-  try {
-    const data = await generateOnce();
-    return NextResponse.json(data, { status: 201 });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = FeedSchema.parse(JSON.parse(raw));
+
+    // Save idempotently (upsert on date_utc)
+    const { error } = await supabase
+      .from("feed")
+      .upsert(
+        [
+          {
+            date_utc: parsed.date_utc,
+            model: parsed.model || "gpt-4o-mini",
+            items: parsed.items,
+          },
+        ],
+        { onConflict: "date_utc" }
+      );
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, date_utc: parsed.date_utc, count: parsed.items.length }, { status: 201 });
   } catch (err: any) {
-    console.error("GEN ERROR:", err);
-    const message = err?.message || err?.toString?.() || "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
   }
 }
 
-/** Convenience: allow GET from browser to trigger generation */
+// Expose BOTH methods so browser and cron can hit it
 export async function GET() {
-  return POST();
+  return handleGenerate();
+}
+export async function POST() {
+  return handleGenerate();
 }

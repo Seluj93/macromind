@@ -1,138 +1,127 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import NewsBlock from '../components/NewsBlock';
-import InvestmentAdvisor from '../components/InvestmentAdvisor';
+import { useEffect, useState } from "react";
+import NewsBlock from "@/components/NewsBlock";
+import InvestmentAdvisor from "@/components/InvestmentAdvisor";
 
-type NewsItem = { title: string; trendIcon?: string };
+/** ------- Fallback mock feed (renders until API has data) ------- */
+type NewsItem = { title: string; trendIcon: string };
 type NewsBlockType = { title: string; icon: string; items: NewsItem[] };
 
 const initialFeed: NewsBlockType[] = [
-  {
-    title: 'Macroeconomics',
-    icon: '🏛️',
-    items: [
-      { title: 'US unemployment rate remains at 3.6%', trendIcon: '➖' },
-      { title: 'Eurozone inflation dips to 2.3%', trendIcon: '📉' },
-    ],
-  },
-  {
-    title: 'Markets & Assets',
-    icon: '📊',
-    items: [
-      { title: 'S&P 500 hits new record high', trendIcon: '📈' },
-      { title: 'Gold rises above $2,100 amid inflation fears', trendIcon: '📈' },
-    ],
-  },
-  {
-    title: 'Geopolitics',
-    icon: '🌍',
-    items: [
-      { title: 'China and Philippines clash in South China Sea', trendIcon: '📉' },
-      { title: "Russia warns of NATO 'provocation' near Kaliningrad", trendIcon: '📉' },
-    ],
-  },
-  {
-    title: 'Trade & Supply Chain',
-    icon: '🚢',
-    items: [
-      { title: 'US and India sign new trade pact', trendIcon: '📈' },
-      { title: 'Global container rates rise 10%', trendIcon: '📈' },
-    ],
-  },
-  {
-    title: 'Energy & Commodities',
-    icon: '⚡',
-    items: [
-      { title: 'Oil prices surge after OPEC cuts', trendIcon: '📈' },
-      { title: 'Europe boosts LNG reserves', trendIcon: '📈' },
-    ],
-  },
-  {
-    title: 'Companies & Sectors',
-    icon: '🏢',
-    items: [
-      { title: 'Amazon reports strong Q2 revenue, stock up 6%', trendIcon: '📈' },
-      { title: 'Apple delays Vision Pro launch in Europe', trendIcon: '📉' },
-    ],
-  },
-  {
-    title: 'Science & Tech',
-    icon: '🔬',
-    items: [
-      { title: 'Breakthrough in quantum computing', trendIcon: '📈' },
-      { title: 'AI detects cancer cells with 96% accuracy', trendIcon: '📈' },
-    ],
-  },
-  {
-    title: 'Crypto & DeFi',
-    icon: '₿',
-    items: [
-      { title: 'Bitcoin breaks $70K resistance', trendIcon: '📈' },
-      { title: 'SEC delays Ethereum ETF decision', trendIcon: '➖' },
-    ],
-  },
+  { title: "Macroeconomics", icon: "🏛️", items: [
+    { title: "Placeholder macro item 1", trendIcon: "➖" },
+    { title: "Placeholder macro item 2", trendIcon: "➖" },
+  ]},
+  { title: "Markets & Assets", icon: "📊", items: [
+    { title: "Placeholder markets item 1", trendIcon: "➖" },
+    { title: "Placeholder markets item 2", trendIcon: "➖" },
+  ]},
+  { title: "Geopolitics", icon: "🌍", items: [
+    { title: "Placeholder geo item 1", trendIcon: "➖" },
+    { title: "Placeholder geo item 2", trendIcon: "➖" },
+  ]},
+  { title: "Trade & Supply Chain", icon: "🚢", items: [
+    { title: "Placeholder trade item 1", trendIcon: "➖" },
+    { title: "Placeholder trade item 2", trendIcon: "➖" },
+  ]},
+  { title: "Energy & Commodities", icon: "⚡", items: [
+    { title: "Placeholder energy item 1", trendIcon: "➖" },
+    { title: "Placeholder energy item 2", trendIcon: "➖" },
+  ]},
+  { title: "Companies & Sectors", icon: "🏢", items: [
+    { title: "Placeholder companies item 1", trendIcon: "➖" },
+    { title: "Placeholder companies item 2", trendIcon: "➖" },
+  ]},
+  { title: "Science & Tech", icon: "🔬", items: [
+    { title: "Placeholder tech item 1", trendIcon: "➖" },
+    { title: "Placeholder tech item 2", trendIcon: "➖" },
+  ]},
+  { title: "Crypto & DeFi", icon: "₿", items: [
+    { title: "Placeholder crypto item 1", trendIcon: "➖" },
+    { title: "Placeholder crypto item 2", trendIcon: "➖" },
+  ]},
 ];
 
-export default function Home() {
-  const [feed, setFeed] = useState(initialFeed);
-  const [selected, setSelected] = useState<string | null>(null);
+/** ------- Map API items -> UI blocks ------- */
+type ApiItem = {
+  category: string;
+  title: string;
+  sentiment?: "Bullish" | "Bearish" | "Neutral";
+};
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
-    const newFeed = Array.from(feed);
-    const [moved] = newFeed.splice(result.source.index, 1);
-    newFeed.splice(result.destination.index, 0, moved);
-    setFeed(newFeed);
-  };
+const CATEGORY_ICONS: Record<string, string> = {
+  "Macroeconomics": "🏛️",
+  "Markets & Assets": "📊",
+  "Geopolitics": "🌍",
+  "Trade & Supply Chain": "🚢",
+  "Energy & Commodities": "⚡",
+  "Companies & Sectors": "🏢",
+  "Science & Tech": "🔬",
+  "Crypto & DeFi": "₿",
+};
+
+const SENTIMENT_ICON: Record<string, string> = {
+  Bullish: "📈",
+  Bearish: "📉",
+  Neutral: "➖",
+};
+
+function toBlocks(items: ApiItem[]): NewsBlockType[] {
+  const cats = Object.keys(CATEGORY_ICONS);
+  const grouped: Record<string, NewsItem[]> = Object.fromEntries(
+    cats.map((c) => [c, [] as NewsItem[]])
+  );
+
+  for (const it of items) {
+    if (!CATEGORY_ICONS[it.category]) continue;
+    grouped[it.category].push({
+      title: it.title,
+      trendIcon: it.sentiment ? SENTIMENT_ICON[it.sentiment] : "➖",
+    });
+  }
+
+  return cats.map((c) => ({
+    title: c,
+    icon: CATEGORY_ICONS[c],
+    items: (grouped[c] || []).slice(0, 2),
+  }));
+}
+
+/** ------- Page ------- */
+export default function HomePage() {
+  const [feed, setFeed] = useState<NewsBlockType[]>(initialFeed);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/feed/latest", { cache: "no-store" });
+        if (!res.ok) return; // keep fallback until first generation exists
+        const json = await res.json();
+        const blocks = toBlocks(json.items as ApiItem[]);
+        if (blocks.some((b) => b.items.length)) setFeed(blocks);
+      } catch (e) {
+        console.warn("Failed to load latest feed", e);
+      }
+    })();
+  }, []);
 
   return (
-    <main className="min-h-screen bg-black text-white px-4 py-10">
-      <h1 className="text-3xl font-bold text-center mb-10 flex justify-center items-center gap-2">
-        🧠 <span>MacroMind</span>
-      </h1>
+    <main className="min-h-screen p-4 md:p-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {feed.map((block, idx) => (
+          <NewsBlock
+            key={block.title + idx}
+            title={block.title}
+            icon={block.icon}
+            items={block.items}
+          />
+        ))}
+      </div>
 
-      {/* NEWS GRID (draggable) */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="newsfeed" direction="horizontal">
-          {(provided) => (
-            <div
-              className="flex flex-wrap justify-center gap-6"
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-            >
-              {feed.map((block, index) => (
-                <Draggable key={block.title} draggableId={block.title} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      onClick={() => setSelected(block.title)}
-                      className={`
-                        w-full sm:w-[48%] lg:w-[22%] transition-all cursor-pointer rounded-xl
-                        ${selected === block.title ? 'ring-4 ring-indigo-400' : ''}
-                        ${snapshot.isDragging ? 'scale-105 opacity-80' : ''}
-                      `}
-                    >
-                      <NewsBlock {...block} />
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* ADVISOR ROW (centered + separated) */}
-      <div className="flex flex-wrap justify-center gap-6 mt-10">
+      <div className="mt-6">
         <InvestmentAdvisor />
       </div>
     </main>
   );
 }
-
