@@ -90,7 +90,6 @@ async function handleGenerate() {
     );
 
     const completion = await openai.chat.completions.create({
-      // 🔁 this was "gpt-5-turbo" in your deploy; that’s why you got the 404
       model: "gpt-4o-mini",
       temperature: 0.2,
       response_format: { type: "json_object" },
@@ -125,8 +124,11 @@ async function handleGenerate() {
     if (error) throw error;
 
     return NextResponse.json({ ok: true, date_utc: parsed.date_utc, count: parsed.items.length }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: "Unknown error" }, { status: 500 });
   }
 }
 
